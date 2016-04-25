@@ -111,7 +111,7 @@ declare module __Backendless {
      * @constructor
      */
     class Async {
-        constructor(onSuccess:(data?:Object) => void, onError?:((data:Object) => void) | Object, context?:Object);
+        constructor(onSuccess?:(data?:Object) => void, onError?:((data:Object) => void) | Object, context?:Object);
 
         success(data:Object):void;
 
@@ -773,11 +773,11 @@ declare module __Backendless {
         restorePassword(email:string):Backendless.User ;
         restorePassword(email:string, async:Backendless.Async):XMLHttpRequest;
 
-        assignRole(userName:string, roleName:string):Backendless.User ;
-        assignRole(userName:string, roleName:string, async:Backendless.Async):XMLHttpRequest;
+        assignRole(identity:string, roleName:string):Backendless.User ;
+        assignRole(identity:string, roleName:string, async:Backendless.Async):XMLHttpRequest;
 
-        unassignRole(userName:string, roleName:string):Backendless.User ;
-        unassignRole(userName:string, roleName:string, async:Backendless.Async):XMLHttpRequest;
+        unassignRole(identity:string, roleName:string):Backendless.User ;
+        unassignRole(identity:string, roleName:string, async:Backendless.Async):XMLHttpRequest;
 
         login(userName:string, password:string):Backendless.User ;
         login(userName:string, password:string, stayLoggedIn:boolean):Backendless.User ;
@@ -793,15 +793,15 @@ declare module __Backendless {
         update(user:Backendless.User):Backendless.User ;
         update(user:Backendless.User, async:Backendless.Async):XMLHttpRequest;
 
-        loginWithFacebook(fields?:Object, permissions?:Object, async?:Backendless.Async, stayLoggedIn:boolean):void;
+        loginWithFacebook(fields?:Object, permissions?:Object, async?:Backendless.Async, stayLoggedIn?:boolean):void;
 
-        loginWithGooglePlus(fields?:Object, permissions?:Object, async?:Backendless.Async, container?:HTMLElement, stayLoggedIn:boolean):void;
+        loginWithGooglePlus(fields?:Object, permissions?:Object, container?:HTMLElement, async?:Backendless.Async, stayLoggedIn?:boolean):void;
 
-        loginWithTwitter(fields?:Object, async?:Backendless.Async, stayLoggedIn:boolean):void;
+        loginWithTwitter(fields?:Object, async?:Backendless.Async, stayLoggedIn?:boolean):void;
 
-        loginWithFacebookSdk(fields?:Object, stayLoggedIn:boolean, async?:Backendless.Async):void;
+        loginWithFacebookSdk(fields?:Object, stayLoggedIn?:boolean, async?:Backendless.Async):void;
 
-        loginWithGooglePlusSdk(fields?:Object, stayLoggedIn:boolean, async?:Backendless.Async):void;
+        loginWithGooglePlusSdk(fields?:Object, stayLoggedIn?:boolean, async?:Backendless.Async):void;
 
         isValidLogin():boolean;
         isValidLogin(async:Backendless.Async):XMLHttpRequest;
@@ -938,6 +938,7 @@ declare module __Backendless {
         totalObjects: number;
         getPage : (offset:number, pageSize:number, async:Backendless.Async)=>any;
         nextPage: (async:Backendless.Async)=>any;
+        data: Object[];
     }
 
     interface GeoCollectionResultI extends CollectionResultI {

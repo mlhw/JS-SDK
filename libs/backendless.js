@@ -409,8 +409,6 @@
             }
         };
 
-        var buffer = '';
-
         if (currentUser != null && !!currentUser["user-token"]) {
             options.headers["user-token"] = currentUser["user-token"];
         }
@@ -419,23 +417,23 @@
             throw new Error('Use Async type of request using Backendless with NodeJS. Add Backendless.Async(successCallback, errorCallback) as last argument');
         }
 
+        var buffer;
         var httpx = require(https ? 'https' : 'http');
-
         var req = httpx.request(options, function(res) {
             res.setEncoding('utf8');
             res.on('data', function(chunk) {
-                buffer += chunk;
+                buffer = buffer ? buffer + chunk : chunk;
             });
             res.on('end', function() {
-                var contentType = res.headers['content-type'];
-
-                if (contentType && contentType.indexOf('application/json') !== -1) {
-                    buffer = tryParseJSON(buffer);
-                }
-
                 var callback = config.asyncHandler[res.statusCode >= 200 && res.statusCode < 300 ? "success" : "fault"];
 
                 if (Utils.isFunction(callback)) {
+                    var contentType = res.headers['content-type'];
+
+                    if (buffer !== undefined && contentType && contentType.indexOf('application/json') !== -1) {
+                        buffer = tryParseJSON(buffer);
+                    }
+
                     callback(buffer);
                 }
             });
@@ -1499,9 +1497,9 @@
             return isAsync ? result : this._parseResponse(result);
         },
 
-        roleHelper: function(username, rolename, async, operation) {
-            if (!username) {
-                throw new Error('Username can not be empty');
+        roleHelper: function(identity, rolename, async, operation) {
+            if (!identity) {
+                throw new Error('User identity can not be empty');
             }
 
             if (!rolename) {
@@ -1509,32 +1507,22 @@
             }
 
             var responder = extractResponder(arguments);
-            var isAsync = responder != null;
-
-            if (responder) {
-                responder = this._wrapAsync(responder);
-            }
-
-            var data = {
-                user    : username,
-                roleName: rolename
-            };
 
             return Backendless._ajax({
                 method      : 'POST',
                 url         : this.restUrl + '/' + operation,
-                isAsync     : isAsync,
+                isAsync     : !!responder,
                 asyncHandler: responder,
-                data        : JSON.stringify(data)
+                data        : JSON.stringify({user : identity, roleName: rolename})
             });
         },
 
-        assignRole: function(username, rolename, async) {
-            return this.roleHelper(username, rolename, async, 'assignRole');
+        assignRole: function(identity, rolename, async) {
+            return this.roleHelper(identity, rolename, async, 'assignRole');
         },
 
-        unassignRole: function(username, rolename, async) {
-            return this.roleHelper(username, rolename, async, 'unassignRole');
+        unassignRole: function(identity, rolename, async) {
+            return this.roleHelper(identity, rolename, async, 'unassignRole');
         },
 
         login: function(username, password, stayLoggedIn, async) {
@@ -1714,16 +1702,19 @@
             return isAsync ? result : this._parseResponse(result);
         },
 
-        loginWithFacebook      : function(facebookFieldsMapping, permissions, callback, stayLoggedIn) {
-            this._loginSocial('Facebook', facebookFieldsMapping, permissions, callback, null, stayLoggedIn);
+        loginWithFacebook      : function(facebookFieldsMapping, permissions, async, stayLoggedIn) {
+            async = extractResponder(arguments);
+            this._loginSocial('Facebook', facebookFieldsMapping, permissions, async, null, stayLoggedIn);
         },
 
-        loginWithGooglePlus    : function(googlePlusFieldsMapping, permissions, callback, container, stayLoggedIn) {
-            this._loginSocial('GooglePlus', googlePlusFieldsMapping, permissions, callback, container, stayLoggedIn);
+        loginWithGooglePlus    : function(googlePlusFieldsMapping, permissions, async, container, stayLoggedIn) {
+            async = extractResponder(arguments);
+            this._loginSocial('GooglePlus', googlePlusFieldsMapping, permissions, async, container, stayLoggedIn);
         },
 
-        loginWithTwitter       : function(twitterFieldsMapping, callback, stayLoggedIn) {
-            this._loginSocial('Twitter', twitterFieldsMapping, null, callback, null, stayLoggedIn);
+        loginWithTwitter       : function(twitterFieldsMapping, async, stayLoggedIn) {
+            async = extractResponder(arguments);
+            this._loginSocial('Twitter', twitterFieldsMapping, null, async, null, stayLoggedIn);
         },
 
         _socialContainer       : function(socialType, container) {
@@ -1784,23 +1775,20 @@
             }
         },
 
-        _loginSocial: function(socialType, fieldsMapping, permissions, callback, container, stayLoggedIn) {
+        _loginSocial: function(socialType, fieldsMapping, permissions, async, container, stayLoggedIn) {
             var socialContainer = new this._socialContainer(socialType, container);
-            var responder = extractResponder(arguments);
-            if (responder) {
-                responder = this._wrapAsync(responder);
-            }
+            async = async && this._wrapAsync(async);
 
             Utils.addEvent('message', window, function(e) {
                 if (e.origin == Backendless.serverURL) {
                     var result = JSON.parse(e.data);
 
                     if (result.fault) {
-                        responder.fault(result.fault);
+                        async.fault(result.fault);
                     } else {
                         Backendless.LocalCache.set("stayLoggedIn", !!stayLoggedIn);
                         currentUser = this.Backendless.UserService._parseResponse(result);
-                        responder.success(this.Backendless.UserService._getUserFromResponse(currentUser));
+                        async.success(this.Backendless.UserService._getUserFromResponse(currentUser));
                     }
 
                     Utils.removeEvent('message', window);
@@ -1812,7 +1800,7 @@
                 socialContainer.doAuthorizationActivity(r);
             }, function(e) {
                 socialContainer.closeContainer();
-                responder.fault(e);
+                async.fault(e);
             });
 
             var request = {};
@@ -4203,7 +4191,7 @@
                             lastFlushListeners = null;
                         }
                     }
-                }
+                };
 
                 if (async) {
                     listeners = lastFlushListeners = lastFlushListeners ? lastFlushListeners.splice(0) : [];
@@ -4360,7 +4348,7 @@
                              'getCategories', 'deleteCategory', 'deletePoint']],
             [UserService.prototype, ['register', 'getUserRoles', 'roleHelper', 'login', 'describeUserClass',
                                      'restorePassword', 'logout', 'update', 'isValidLogin', 'loginWithFacebookSdk',
-                                     'loginWithGooglePlusSdk','loginWithFacebook', 'loginWithGooglePlus', 'loginWithTwitter']]
+                                     'loginWithGooglePlusSdk', 'loginWithGooglePlus', 'loginWithTwitter', 'loginWithFacebook']]
         ].forEach(promisifyPack);
 
         UserService.prototype.getCurrentUser = function() {
