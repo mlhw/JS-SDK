@@ -1,4 +1,4 @@
-// Backendless.js 3.1.7
+// Backendless.js 3.1.10
 
 (function(factory) {
     var root = (typeof self == 'object' && self.self === self && self) ||
@@ -36,7 +36,7 @@
         emptyFn     = (function() {
         });
 
-    Backendless.VERSION = '3.1.7';
+    Backendless.VERSION = '3.1.10';
     Backendless.serverURL = 'https://api.backendless.com';
 
     Backendless.noConflict = function() {
@@ -380,26 +380,25 @@
 
     Backendless._ajax_for_nodejs = function(config) {
         config.data = config.data || "";
+        config.asyncHandler = config.asyncHandler || {};
+        config.isAsync = (typeof config.isAsync == 'boolean') ? config.isAsync : false;
+
+        if (!config.isAsync) {
+            throw new Error('Use Async type of request using Backendless with NodeJS. Add Backendless.Async(successCallback, errorCallback) as last argument');
+        }
 
         if (typeof config.data !== "string") {
             config.data = JSON.stringify(config.data);
         }
 
-        config.asyncHandler = config.asyncHandler || {};
-        config.isAsync = (typeof config.isAsync == 'boolean') ? config.isAsync : false;
-
-        var protocol = config.url.substr(0, config.url.indexOf('/', 8)).substr(0, config.url.indexOf(":"));
-        var https = protocol === 'https';
-
-        var uri  = config.url.substr(0, config.url.indexOf('/', 8)).substr(config.url.indexOf("/") + 2),
-            host = uri.substr(0, (uri.indexOf(":") == -1 ? uri.length : uri.indexOf(":"))),
-            port = uri.indexOf(":") != -1 ? parseInt(uri.substr(uri.indexOf(":") + 1)) : (https ? 443 : 80);
+        var u = require('url').parse(config.url);
+        var https = u.protocol === 'https:';
 
         var options = {
-            host   : host,
-            port   : port,
+            host   : u.hostname,
+            port   : u.port || (https ? 443 : 80),
             method : config.method || "GET",
-            path   : config.url.substr(config.url.indexOf('/', 8)),
+            path   : u.path,
             headers: {
                 "Content-Length"  : config.data ? Buffer.byteLength(config.data) : 0,
                 "Content-Type"    : config.data ? 'application/json' : 'application/x-www-form-urlencoded',
@@ -411,10 +410,6 @@
 
         if (currentUser != null && !!currentUser["user-token"]) {
             options.headers["user-token"] = currentUser["user-token"];
-        }
-
-        if (!config.isAsync) {
-            throw new Error('Use Async type of request using Backendless with NodeJS. Add Backendless.Async(successCallback, errorCallback) as last argument');
         }
 
         var buffer;
@@ -440,8 +435,7 @@
         });
 
         req.on('error', function(e) {
-            config.asyncHandler.fault || (config.asyncHandler.fault = function() {});
-            config.asyncHandler.fault(e);
+            config.asyncHandler.fault && config.asyncHandler.fault(e);
         });
 
         req.write(config.data);
@@ -664,7 +658,7 @@
 
             var expired = function(obj) {
                 var result = false;
-                if (Object.prototype.toString.call(obj).slice(8, -1) == "Object") {
+                if (obj && Object.prototype.toString.call(obj).slice(8, -1) == "Object") {
                     if ('cachePolicy' in obj && 'timeToLive' in obj['cachePolicy'] && obj['cachePolicy']['timeToLive'] != -1 && 'created' in obj['cachePolicy']) {
                         result = (new Date().getTime() - obj['cachePolicy']['created']) > obj['cachePolicy']['timeToLive'];
                     }
@@ -674,7 +668,7 @@
             };
 
             var addTimestamp = function(obj) {
-                if (Object.prototype.toString.call(obj).slice(8, -1) == "Object") {
+                if (obj && Object.prototype.toString.call(obj).slice(8, -1) == "Object") {
                     if ('cachePolicy' in obj && 'timeToLive' in obj['cachePolicy']) {
                         obj['cachePolicy']['created'] = new Date().getTime();
                     }
@@ -2022,12 +2016,20 @@
             }
         },
 
-        addPoint        : function(geopoint, async) {
+        savePoint        : function(geopoint, async) {
             if (geopoint.latitude === undefined || geopoint.longitude === undefined) {
                 throw 'Latitude or longitude not a number';
             }
             geopoint.categories = geopoint.categories || ['Default'];
             geopoint.categories = Utils.isArray(geopoint.categories) ? geopoint.categories : [geopoint.categories];
+
+            var objectId = geopoint.objectId;
+            var method = objectId ? 'PATCH' : 'PUT',
+                url = this.restUrl + '/points';
+
+            if (objectId) {
+                url += '/' + objectId;
+            }
 
             var responder = extractResponder(arguments);
             var isAsync = responder != null;
@@ -2054,12 +2056,17 @@
             responder = responderOverride(responder);
 
             return Backendless._ajax({
-                method      : 'PUT',
-                url         : this.restUrl + '/points',
+                method      : method,
+                url         : url,
                 data        : JSON.stringify(geopoint),
                 isAsync     : isAsync,
                 asyncHandler: responder
             });
+        },
+      
+        /** @deprecated */
+        addPoint: function(geopoint, async) {
+          return this.savePoint.apply(this, arguments);
         },
 
         findUtil        : function(query, async) {
@@ -4344,7 +4351,7 @@
             [Backendless.Logging, ['flush']],
             [Messaging.prototype, ['publish', 'sendEmail', 'cancel', 'subscribe', 'registerDevice',
                                    'getRegistrations', 'unregisterDevice']],
-            [Geo.prototype, ['addPoint', 'findUtil', 'loadMetadata', 'getClusterPoints', 'addCategory',
+            [Geo.prototype, ['addPoint', 'savePoint', 'findUtil', 'loadMetadata', 'getClusterPoints', 'addCategory',
                              'getCategories', 'deleteCategory', 'deletePoint']],
             [UserService.prototype, ['register', 'getUserRoles', 'roleHelper', 'login', 'describeUserClass',
                                      'restorePassword', 'logout', 'update', 'isValidLogin', 'loginWithFacebookSdk',
@@ -4379,8 +4386,7 @@
             return Backendless.UserService.getCurrentUser()
                 .then(function(user) {
                     return Promise.resolve(!!user);
-                })
-                .catch(function() {
+                }, function() {
                     return Promise.resolve(false);
                 });
         };
@@ -4478,23 +4484,25 @@
         }
     };
 
-    var GeoPoint = function() {
+    var GeoPoint = function(args) {
+        args = args || {};
         this.___class = "GeoPoint";
-        this.categories = undefined;
-        this.latitude = undefined;
-        this.longitude = undefined;
-        this.metadata = undefined;
-        this.objectId = undefined;
+        this.categories = args.categories;
+        this.latitude = args.latitude;
+        this.longitude = args.longitude;
+        this.metadata = args.metadata;
+        this.objectId = args.objectId;
     };
 
-    var GeoCluster = function() {
-        this.categories = undefined;
-        this.latitude = undefined;
-        this.longitude = undefined;
-        this.metadata = undefined;
-        this.objectId = undefined;
-        this.totalPoints = undefined;
-        this.geoQuery = undefined;
+    var GeoCluster = function(args) {
+        args = args || {};
+        this.categories = args.categories;
+        this.latitude = args.latitude;
+        this.longitude = args.longitude;
+        this.metadata = args.metadata;
+        this.objectId = args.objectId;
+        this.totalPoints = args.totalPoints;
+        this.geoQuery = args.geoQuery;
     };
 
     var PublishOptionsHeaders = { //PublishOptions headers namespace helper
