@@ -1,4 +1,4 @@
-// Backendless.js 3.1.10
+// Backendless.js 3.1.12
 
 (function(factory) {
     var root = (typeof self == 'object' && self.self === self && self) ||
@@ -36,7 +36,7 @@
         emptyFn     = (function() {
         });
 
-    Backendless.VERSION = '3.1.10';
+    Backendless.VERSION = '3.1.12';
     Backendless.serverURL = 'https://api.backendless.com';
 
     Backendless.noConflict = function() {
@@ -76,8 +76,13 @@
     initXHR();
 
     var browser = (function() {
-        var ua      = isBrowser ? navigator.userAgent.toLowerCase() : "NodeJS",
-            match   = (/(chrome)[ \/]([\w.]+)/.exec(ua) ||
+        var ua = 'NodeJS';
+
+        if (isBrowser) {
+            ua = navigator.userAgent ? navigator.userAgent.toLowerCase() : 'hybrid-app';
+        }
+
+        var match   = (/(chrome)[ \/]([\w.]+)/.exec(ua) ||
             /(webkit)[ \/]([\w.]+)/.exec(ua) ||
             /(opera)(?:.*version|)[ \/]([\w.]+)/.exec(ua) ||
             /(msie) ([\w.]+)/.exec(ua) ||
@@ -1911,6 +1916,21 @@
                     return !!user;
                 }
             }
+        },
+
+        resendEmailConfirmation: function(emailAddress, async) {
+            if(!emailAddress || emailAddress instanceof Async) {
+                throw "Email cannot be empty";
+            }
+            var responder = extractResponder(arguments);
+            var isAsync = !!responder;
+
+            return Backendless._ajax({
+                method      : 'POST',
+                url         : this.restUrl + "/resendconfirmation/" + emailAddress,
+                isAsync     : isAsync,
+                asyncHandler: responder
+            });
         }
     };
 
@@ -4355,7 +4375,8 @@
                              'getCategories', 'deleteCategory', 'deletePoint']],
             [UserService.prototype, ['register', 'getUserRoles', 'roleHelper', 'login', 'describeUserClass',
                                      'restorePassword', 'logout', 'update', 'isValidLogin', 'loginWithFacebookSdk',
-                                     'loginWithGooglePlusSdk', 'loginWithGooglePlus', 'loginWithTwitter', 'loginWithFacebook']]
+                                     'loginWithGooglePlusSdk', 'loginWithGooglePlus', 'loginWithTwitter', 'loginWithFacebook',
+                                     'resendEmailConfirmation']]
         ].forEach(promisifyPack);
 
         UserService.prototype.getCurrentUser = function() {
@@ -4566,29 +4587,33 @@
     Backendless.SubscriptionOptions = SubscriptionOptions;
     Backendless.PublishOptionsHeaders = PublishOptionsHeaders;
 
-    /** @deprecated */
-    root.GeoPoint = Backendless.GeoPoint;
+    try {
+        /** @deprecated */
+        root.GeoPoint = Backendless.GeoPoint;
 
-    /** @deprecated */
-    root.GeoCluster = Backendless.GeoCluster;
+        /** @deprecated */
+        root.GeoCluster = Backendless.GeoCluster;
 
-    /** @deprecated */
-    root.BackendlessGeoQuery = Backendless.GeoQuery;
+        /** @deprecated */
+        root.BackendlessGeoQuery = Backendless.GeoQuery;
 
-    /** @deprecated */
-    root.Bodyparts = Backendless.Bodyparts;
+        /** @deprecated */
+        root.Bodyparts = Backendless.Bodyparts;
 
-    /** @deprecated */
-    root.PublishOptions = Backendless.PublishOptions;
+        /** @deprecated */
+        root.PublishOptions = Backendless.PublishOptions;
 
-    /** @deprecated */
-    root.DeliveryOptions = Backendless.DeliveryOptions;
+        /** @deprecated */
+        root.DeliveryOptions = Backendless.DeliveryOptions;
 
-    /** @deprecated */
-    root.SubscriptionOptions = Backendless.SubscriptionOptions;
+        /** @deprecated */
+        root.SubscriptionOptions = Backendless.SubscriptionOptions;
 
-    /** @deprecated */
-    root.PublishOptionsHeaders = Backendless.PublishOptionsHeaders;
+        /** @deprecated */
+        root.PublishOptionsHeaders = Backendless.PublishOptionsHeaders;
+    } catch (error) {
+        console && console.warn(error);
+    }
 
     return Backendless;
 });
