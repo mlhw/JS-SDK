@@ -1,4 +1,4 @@
-// Backendless.js 3.1.16
+// Backendless.js 3.1.17
 
 (function(factory) {
     var root = (typeof self == 'object' && self.self === self && self) ||
@@ -1716,15 +1716,21 @@
             }
         },
 
-        getCurrentUser: function() {
+        getCurrentUser: function(async) {
             if (currentUser) {
-                return this._getUserFromResponse(currentUser);
+                var userFromResponse = this._getUserFromResponse(currentUser);
+
+                return async ? async.success(userFromResponse) : userFromResponse;
             }
 
             var stayLoggedIn = Backendless.LocalCache.get("stayLoggedIn");
             var currentUserId = stayLoggedIn && Backendless.LocalCache.get("current-user-id");
 
-            return currentUserId && persistence.of(User).findById(currentUserId) || null;
+            if (currentUserId) {
+                return persistence.of(User).findById(currentUserId, async);
+            }
+
+            return async ? async.success(null) : null;
         },
 
         update: function(user, async) {
@@ -4276,7 +4282,7 @@
                 Backendless._ajax({
                     method      : 'PUT',
                     isAsync     : !!async,
-                    asyncHandler: async && new Async(cb('success'), cb('failure')),
+                    asyncHandler: async && new Async(cb('success'), cb('fault')),
                     url         : Backendless.serverURL + '/' + Backendless.appVersion + '/log',
                     data        : JSON.stringify(this.logInfo)
                 });
