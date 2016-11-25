@@ -1,4 +1,4 @@
-// Backendless.js 3.1.20
+// Backendless.js 3.1.21
 
 (function(factory) {
     var root = (typeof self == 'object' && self.self === self && self) ||
@@ -46,7 +46,7 @@
         return this;
     };
 
-    Backendless.XMLHttpRequest = XMLHttpRequest;
+    Backendless.XMLHttpRequest = typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest;
 
     if (!Array.prototype.indexOf) {
         Array.prototype.indexOf = function(searchElement, fromIndex) {
